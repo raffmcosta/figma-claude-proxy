@@ -1,0 +1,28 @@
+{
+  "name": "figma-claude-proxy",
+  "version": "1.0.0",
+  "description": "A Vercel proxy server to handle Figma plugin requests to Claude API",
+  "main": "api/claude-proxy.ts",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "figma",
+    "claude",
+    "proxy",
+    "vercel",
+    "anthropic"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@vercel/node": "^3.0.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vercel": "^33.0.0"
+  }
+}
