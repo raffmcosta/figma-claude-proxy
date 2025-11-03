@@ -68,12 +68,16 @@ function validateClaudeRequest(body: any): { valid: boolean; error?: string } {
 
   // Validate model (whitelist allowed models)
   const allowedModels = [
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-sonnet-20240620",
-    "claude-3-opus-20240229",
-    "claude-3-sonnet-20240229",
+    // Latest Claude 4.x models (2025)
+    "claude-sonnet-4-5-20250929",
+    "claude-haiku-4-5-20251001",
+    "claude-opus-4-1-20250805",
+    "claude-sonnet-4-20250514",
+    "claude-opus-4-20250514",
+    // Legacy Claude 3.x models
+    "claude-3-7-sonnet-20250219",
+    "claude-3-5-haiku-20241022",
     "claude-3-haiku-20240307",
-    "claude-3-7-sonnet-20250219", // Latest Claude 3.7 Sonnet
   ];
 
   if (!body.model) {
