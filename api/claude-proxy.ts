@@ -5,6 +5,22 @@ import axios, { AxiosError } from "axios";
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
 /**
+ * Logger utility for consistent logging format
+ */
+function log(level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: any) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] [${level}] ${message}`;
+
+  if (level === 'ERROR') {
+    console.error(logMessage, data ? JSON.stringify(data, null, 2) : '');
+  } else if (level === 'WARN') {
+    console.warn(logMessage, data ? JSON.stringify(data, null, 2) : '');
+  } else {
+    console.log(logMessage, data ? JSON.stringify(data, null, 2) : '');
+  }
+}
+
+/**
  * Check if client has exceeded rate limit
  */
 function checkRateLimit(clientId: string): boolean {
@@ -57,6 +73,7 @@ function validateClaudeRequest(body: any): { valid: boolean; error?: string } {
     "claude-3-opus-20240229",
     "claude-3-sonnet-20240229",
     "claude-3-haiku-20240307",
+    "claude-3-7-sonnet-20250219", // Latest Claude 3.7 Sonnet
   ];
 
   if (!body.model) {
@@ -70,9 +87,9 @@ function validateClaudeRequest(body: any): { valid: boolean; error?: string } {
     };
   }
 
-  // Check max_tokens is reasonable (Claude's max is 4096)
-  if (body.max_tokens && (body.max_tokens < 1 || body.max_tokens > 4096)) {
-    return { valid: false, error: "max_tokens must be between 1 and 4096" };
+  // Check max_tokens is reasonable (Claude supports up to 8192 for vision)
+  if (body.max_tokens && (body.max_tokens < 1 || body.max_tokens > 8192)) {
+    return { valid: false, error: "max_tokens must be between 1 and 8192" };
   }
 
   return { valid: true };
@@ -87,7 +104,12 @@ function handleProxyError(error: any, res: VercelResponse) {
     const status = error.response.status;
     const data = error.response.data;
 
-    console.error(`Claude API error ${status}:`, data);
+    log('ERROR', `Claude API error ${status}`, {
+      status,
+      errorType: data.error?.type,
+      errorMessage: data.error?.message,
+      headers: error.response.headers
+    });
 
     // Handle rate limiting with retry-after
     if (status === 429) {
@@ -137,7 +159,7 @@ function handleProxyError(error: any, res: VercelResponse) {
     if (error.code === "ECONNABORTED") {
       return res.status(504).json({
         error: "request_timeout",
-        message: "Claude API request timed out after 30 seconds",
+        message: "Claude API request timed out after 60 seconds",
       });
     }
 
@@ -150,7 +172,11 @@ function handleProxyError(error: any, res: VercelResponse) {
   }
 
   // Handle other errors
-  console.error("Unexpected proxy error:", error);
+  log('ERROR', 'Unexpected proxy error', {
+    error: error.message,
+    stack: error.stack,
+    name: error.name
+  });
   return res.status(500).json({
     error: "internal_server_error",
     message: "An unexpected error occurred while proxying your request",
@@ -179,22 +205,32 @@ export default async function handler(
   }
 
   try {
+    // Log incoming request
+    const clientId =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.socket.remoteAddress ||
+      "unknown";
+
+    log('INFO', 'Incoming proxy request', {
+      clientId,
+      method: req.method,
+      model: req.body?.model,
+      maxTokens: req.body?.max_tokens,
+      messageCount: req.body?.messages?.length
+    });
+
     // Validate request method
     if (req.method !== "POST") {
+      log('WARN', 'Invalid method', { method: req.method, clientId });
       return res.status(405).json({
         error: "method_not_allowed",
         message: "Only POST requests are supported",
       });
     }
 
-    // Get client identifier (IP address)
-    const clientId =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-      req.socket.remoteAddress ||
-      "unknown";
-
     // Check rate limit
     if (!checkRateLimit(clientId)) {
+      log('WARN', 'Rate limit exceeded', { clientId });
       res.setHeader("Retry-After", "60");
       return res.status(429).json({
         error: "rate_limit_exceeded",
@@ -205,6 +241,11 @@ export default async function handler(
     // Validate request body
     const validation = validateClaudeRequest(req.body);
     if (!validation.valid) {
+      log('WARN', 'Invalid request body', {
+        clientId,
+        error: validation.error,
+        body: req.body
+      });
       return res.status(400).json({
         error: "invalid_request",
         message: validation.error,
@@ -214,7 +255,7 @@ export default async function handler(
     // Extract API key from environment
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      console.error("ANTHROPIC_API_KEY not configured");
+      log('ERROR', 'ANTHROPIC_API_KEY not configured');
       return res.status(500).json({
         error: "server_configuration_error",
         message: "API key not configured on server",
@@ -222,6 +263,12 @@ export default async function handler(
     }
 
     // Forward request to Claude API
+    log('INFO', 'Forwarding request to Claude API', {
+      clientId,
+      model: req.body.model,
+      maxTokens: req.body.max_tokens
+    });
+
     const response = await axios.post(
       "https://api.anthropic.com/v1/messages",
       req.body,
@@ -231,9 +278,22 @@ export default async function handler(
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },
-        timeout: 30000, // 30 second timeout
+        timeout: 60000, // 60 second timeout for vision analysis
+        maxBodyLength: 50 * 1024 * 1024, // 50MB max body size for images
+        maxContentLength: 50 * 1024 * 1024, // 50MB max content size
       }
     );
+
+    // Log successful response
+    log('INFO', 'Claude API response received', {
+      clientId,
+      status: response.status,
+      model: response.data.model,
+      stopReason: response.data.stop_reason,
+      inputTokens: response.data.usage?.input_tokens,
+      outputTokens: response.data.usage?.output_tokens,
+      rateLimitRemaining: response.headers["anthropic-ratelimit-requests-remaining"]
+    });
 
     // Forward Claude's rate limit headers to client
     if (response.headers["anthropic-ratelimit-requests-remaining"]) {
