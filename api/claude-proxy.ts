@@ -189,6 +189,7 @@ function handleProxyError(error: any, res: VercelResponse) {
 
 /**
  * Main proxy handler for Claude API requests
+ * Updated: 2025-11-03 - Added Claude 4.x model support
  */
 export default async function handler(
   req: VercelRequest,
