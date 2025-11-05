@@ -14,8 +14,7 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { streamText } from 'ai';
 
-// Vercel Edge Runtime for optimal streaming performance
-export const runtime = 'edge';
+// Note: Edge runtime removed due to timeout issues. Using Node.js runtime instead.
 
 // CORS headers for Figma plugin
 const corsHeaders = {

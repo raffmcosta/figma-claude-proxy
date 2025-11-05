@@ -7,8 +7,7 @@
 
 import { createDesignAgent } from './design-agent';
 
-// Vercel Edge Runtime for optimal streaming
-export const runtime = 'edge';
+// Note: Edge runtime removed due to timeout issues. Using Node.js runtime instead.
 
 // CORS headers for Figma plugin
 const corsHeaders = {
