@@ -106,7 +106,9 @@ export default async function handler(req: Request) {
     const mappedModel = modelMap[model] || model;
 
     // Validate ANTHROPIC_API_KEY
-    if (!process.env.ANTHROPIC_API_KEY) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+
+    if (!apiKey) {
       console.error('MISSING ANTHROPIC_API_KEY!');
       return new Response(
         JSON.stringify({
@@ -120,8 +122,24 @@ export default async function handler(req: Request) {
       );
     }
 
-    console.log('ANTHROPIC_API_KEY exists:', !!process.env.ANTHROPIC_API_KEY);
-    console.log('ANTHROPIC_API_KEY length:', process.env.ANTHROPIC_API_KEY?.length);
+    // Validate API key format
+    if (!apiKey.startsWith('sk-ant-')) {
+      console.error('INVALID ANTHROPIC_API_KEY FORMAT!');
+      return new Response(
+        JSON.stringify({
+          error: 'Server configuration error: ANTHROPIC_API_KEY has invalid format',
+          hint: 'API key should start with sk-ant-'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('ANTHROPIC_API_KEY exists:', !!apiKey);
+    console.log('ANTHROPIC_API_KEY length:', apiKey.length);
+    console.log('ANTHROPIC_API_KEY prefix:', apiKey.substring(0, 10) + '...');
 
     // Detailed logging for debugging
     console.log('Streaming request:', {
@@ -155,14 +173,26 @@ export default async function handler(req: Request) {
 
     let result;
     try {
+      // Create anthropic provider with explicit API key
+      console.log('[STREAM] Creating anthropic provider...');
+      const provider = anthropic(mappedModel, {
+        apiKey: apiKey,
+      });
+      console.log('[STREAM] Provider created, calling streamText...');
+
       result = await streamText({
-        model: anthropic(mappedModel),
+        model: provider,
         messages,
         temperature: 1,
       });
       console.log('[STREAM] streamText returned successfully');
     } catch (streamError) {
       console.error('[STREAM] streamText threw error:', streamError);
+      console.error('[STREAM] Error details:', {
+        name: streamError?.name,
+        message: streamError?.message,
+        stack: streamError?.stack?.substring(0, 500)
+      });
       throw streamError;
     }
 

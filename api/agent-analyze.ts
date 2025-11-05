@@ -53,18 +53,57 @@ export default async function handler(req: Request) {
       );
     }
 
-    console.log('Agent request:', {
+    // Validate ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+
+    if (!apiKey) {
+      console.error('[AGENT] MISSING ANTHROPIC_API_KEY!');
+      return new Response(
+        JSON.stringify({
+          error: 'Server configuration error: ANTHROPIC_API_KEY is not set',
+          hint: 'Add ANTHROPIC_API_KEY to Vercel environment variables'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Validate API key format
+    if (!apiKey.startsWith('sk-ant-')) {
+      console.error('[AGENT] INVALID ANTHROPIC_API_KEY FORMAT!');
+      return new Response(
+        JSON.stringify({
+          error: 'Server configuration error: ANTHROPIC_API_KEY has invalid format',
+          hint: 'API key should start with sk-ant-'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('[AGENT] ANTHROPIC_API_KEY exists:', !!apiKey);
+    console.log('[AGENT] ANTHROPIC_API_KEY length:', apiKey.length);
+    console.log('[AGENT] ANTHROPIC_API_KEY prefix:', apiKey.substring(0, 10) + '...');
+
+    console.log('[AGENT] Agent request:', {
       model,
       promptLength: userPrompt.length,
       hasContext: !!context,
       contextKeys: context ? Object.keys(context) : []
     });
 
-    // Create the agent with Figma context
-    const { model: agentModel, tools, maxSteps, temperature, system } = createDesignAgent(context || {});
+    // Create the agent with Figma context and explicit API key
+    console.log('[AGENT] Creating design agent...');
+    const { model: agentModel, tools, maxSteps, temperature, system } = createDesignAgent(context || {}, apiKey);
 
     // Import streamText dynamically to use with agent configuration
     const { streamText } = await import('ai');
+
+    console.log('[AGENT] Executing agent with streamText...');
 
     // Execute agent with streaming
     const result = await streamText({
@@ -83,7 +122,7 @@ export default async function handler(req: Request) {
 
       // Log tool calls for debugging
       onStepFinish: (step) => {
-        console.log('Agent step completed:', {
+        console.log('[AGENT] Step completed:', {
           stepNumber: step.stepNumber,
           toolCalls: step.toolCalls?.map(tc => ({
             name: tc.toolName,
@@ -93,6 +132,8 @@ export default async function handler(req: Request) {
         });
       }
     });
+
+    console.log('[AGENT] streamText completed successfully');
 
     // Return streaming response
     return result.toTextStreamResponse({
