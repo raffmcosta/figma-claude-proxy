@@ -12,7 +12,7 @@
  */
 
 import { anthropic } from '@ai-sdk/anthropic';
-import { streamText, StreamData } from 'ai';
+import { streamText } from 'ai';
 
 // Vercel Edge Runtime for optimal streaming performance
 export const runtime = 'edge';
@@ -134,13 +134,12 @@ export default async function handler(req: Request) {
     const result = await streamText({
       model: anthropic(mappedModel),
       messages,
-      maxTokens,
       temperature: 1,
     });
 
     // Return streaming response
     // The SDK handles SSE formatting automatically
-    return result.toDataStreamResponse({
+    return result.toTextStreamResponse({
       headers: corsHeaders,
     });
 

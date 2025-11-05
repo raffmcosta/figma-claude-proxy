@@ -95,7 +95,7 @@ export default async function handler(req: Request) {
     });
 
     // Return streaming response
-    return result.toDataStreamResponse({
+    return result.toTextStreamResponse({
       headers: corsHeaders,
     });
 

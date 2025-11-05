@@ -6,7 +6,6 @@
  */
 
 import { anthropic } from '@ai-sdk/anthropic';
-import { streamText, tool } from 'ai';
 import { z } from 'zod';
 
 // Tool execution context (passed from plugin)
@@ -27,15 +26,15 @@ export function createDesignAgent(context: FigmaContext) {
     tools: {
       // ===== DATA RETRIEVAL TOOLS =====
 
-      analyzeNodeStructure: tool({
+      analyzeNodeStructure: {
         description: 'Analyze the structure and properties of nodes in the current context. Returns hierarchical data, spatial relationships, and properties.',
         parameters: z.object({
           focusArea: z.enum(['all', 'selection', 'frames', 'components']).describe('Which nodes to focus analysis on'),
           includeChildren: z.boolean().default(true).describe('Include child nodes in analysis'),
           maxDepth: z.number().max(5).default(2).describe('Maximum hierarchy depth to analyze')
         }),
-        execute: async ({ focusArea, includeChildren, maxDepth }) => {
-          // Analyze the provided context data
+        execute: async (params: { focusArea: string; includeChildren: boolean; maxDepth: number }) => {
+          const { focusArea, includeChildren, maxDepth } = params;
           const { pageData, selectedNodes } = context;
 
           if (!pageData && !selectedNodes) {
@@ -63,9 +62,9 @@ export function createDesignAgent(context: FigmaContext) {
             summary: `Analyzed ${targetNodes?.length || 0} ${focusArea} nodes with depth ${maxDepth}`
           };
         }
-      }),
+      },
 
-      searchByProperties: tool({
+      searchByProperties: {
         description: 'Search for nodes matching specific properties or patterns (type, name, color, text content, etc.)',
         parameters: z.object({
           type: z.enum(['FRAME', 'TEXT', 'RECTANGLE', 'COMPONENT', 'INSTANCE', 'GROUP', 'ANY']).optional(),
@@ -74,7 +73,8 @@ export function createDesignAgent(context: FigmaContext) {
           colorFilter: z.string().optional().describe('Filter by fill color (hex or rgba)'),
           textContent: z.string().optional().describe('Search for specific text content')
         }),
-        execute: async ({ type, namePattern, hasAutoLayout, colorFilter, textContent }) => {
+        execute: async (params: { type?: string; namePattern?: string; hasAutoLayout?: boolean; colorFilter?: string; textContent?: string }) => {
+          const { type, namePattern, hasAutoLayout, colorFilter, textContent } = params;
           const { pageData, fullData } = context;
           const searchableData = fullData || pageData;
 
@@ -82,7 +82,6 @@ export function createDesignAgent(context: FigmaContext) {
             return { error: 'No data available for search' };
           }
 
-          // Simple search implementation
           const results: any[] = [];
           const searchInNode = (node: any) => {
             let matches = true;
@@ -117,13 +116,13 @@ export function createDesignAgent(context: FigmaContext) {
           return {
             success: true,
             matchCount: results.length,
-            matches: results.slice(0, 20), // Limit to prevent token explosion
+            matches: results.slice(0, 20),
             truncated: results.length > 20
           };
         }
-      }),
+      },
 
-      getDesignSystem: tool({
+      getDesignSystem: {
         description: 'Retrieve design system information including color palette, typography, spacing tokens, and component library',
         parameters: z.object({
           includeColors: z.boolean().default(true),
@@ -131,7 +130,8 @@ export function createDesignAgent(context: FigmaContext) {
           includeComponents: z.boolean().default(true),
           includeSpacing: z.boolean().default(false)
         }),
-        execute: async ({ includeColors, includeTypography, includeComponents, includeSpacing }) => {
+        execute: async (params: { includeColors: boolean; includeTypography: boolean; includeComponents: boolean; includeSpacing: boolean }) => {
+          const { includeColors, includeTypography, includeComponents } = params;
           const { designSystem, pageData } = context;
 
           const result: any = {
@@ -145,7 +145,6 @@ export function createDesignAgent(context: FigmaContext) {
           }
 
           if (includeTypography && pageData?.textContent) {
-            // Extract unique font families and sizes
             const fonts = new Set();
             const sizes = new Set();
             pageData.textContent.forEach((text: any) => {
@@ -167,15 +166,16 @@ export function createDesignAgent(context: FigmaContext) {
 
           return result;
         }
-      }),
+      },
 
-      getFlowAnalysis: tool({
+      getFlowAnalysis: {
         description: 'Analyze user flows, navigation connections, and prototype interactions between screens',
         parameters: z.object({
           includeDeadEnds: z.boolean().default(true),
           includeEntryPoints: z.boolean().default(true)
         }),
-        execute: async ({ includeDeadEnds, includeEntryPoints }) => {
+        execute: async (params: { includeDeadEnds: boolean; includeEntryPoints: boolean }) => {
+          const { includeDeadEnds, includeEntryPoints } = params;
           const { pageData } = context;
 
           if (!pageData?.connections) {
@@ -194,11 +194,11 @@ export function createDesignAgent(context: FigmaContext) {
             summary: `Found ${pageData.connections.length} connections, ${pageData.deadEnds?.length || 0} dead ends, ${pageData.entryPoints?.length || 0} entry points`
           };
         }
-      }),
+      },
 
       // ===== VALIDATION TOOLS =====
 
-      validateAccessibility: tool({
+      validateAccessibility: {
         description: 'Check WCAG accessibility compliance including contrast ratios, text sizes, interactive element sizing, and semantic structure',
         parameters: z.object({
           level: z.enum(['A', 'AA', 'AAA']).default('AA'),
@@ -206,17 +206,15 @@ export function createDesignAgent(context: FigmaContext) {
           checkTextSize: z.boolean().default(true),
           checkTouchTargets: z.boolean().default(true)
         }),
-        execute: async ({ level, checkContrast, checkTextSize, checkTouchTargets }) => {
+        execute: async (params: { level: string; checkContrast: boolean; checkTextSize: boolean; checkTouchTargets: boolean }) => {
+          const { level, checkContrast, checkTextSize, checkTouchTargets } = params;
           const { pageData, selectedNodes } = context;
           const targetNodes = selectedNodes || pageData?.framesHierarchical || [];
 
           const issues: any[] = [];
 
-          // Simple accessibility checks
           const checkNode = (node: any) => {
-            // Contrast check (simplified)
             if (checkContrast && node.type === 'TEXT' && node.fillColor) {
-              // This would need actual contrast calculation
               issues.push({
                 nodeId: node.id,
                 nodeName: node.name,
@@ -227,7 +225,6 @@ export function createDesignAgent(context: FigmaContext) {
               });
             }
 
-            // Text size check
             if (checkTextSize && node.text && node.text.fontSize < 12) {
               issues.push({
                 nodeId: node.id,
@@ -239,7 +236,6 @@ export function createDesignAgent(context: FigmaContext) {
               });
             }
 
-            // Touch target check (44x44 minimum for AA)
             if (checkTouchTargets && node.type === 'INSTANCE' && node.absoluteWidth && node.absoluteHeight) {
               if (node.absoluteWidth < 44 || node.absoluteHeight < 44) {
                 issues.push({
@@ -264,13 +260,13 @@ export function createDesignAgent(context: FigmaContext) {
             success: true,
             wcagLevel: level,
             totalIssues: issues.length,
-            issues: issues.slice(0, 50), // Limit results
+            issues: issues.slice(0, 50),
             summary: `Found ${issues.length} accessibility issues at WCAG ${level} level`
           };
         }
-      }),
+      },
 
-      analyzeDesignQuality: tool({
+      analyzeDesignQuality: {
         description: 'Evaluate overall design quality including consistency, hierarchy, spacing, alignment, and design system compliance',
         parameters: z.object({
           checkConsistency: z.boolean().default(true),
@@ -278,7 +274,8 @@ export function createDesignAgent(context: FigmaContext) {
           checkSpacing: z.boolean().default(true),
           checkAlignment: z.boolean().default(true)
         }),
-        execute: async ({ checkConsistency, checkHierarchy, checkSpacing, checkAlignment }) => {
+        execute: async (params: { checkConsistency: boolean; checkHierarchy: boolean; checkSpacing: boolean; checkAlignment: boolean }) => {
+          const { checkConsistency, checkHierarchy, checkSpacing } = params;
           const { pageData } = context;
 
           const analysis: any = {
@@ -288,7 +285,6 @@ export function createDesignAgent(context: FigmaContext) {
             findings: []
           };
 
-          // Consistency check
           if (checkConsistency && pageData?.components) {
             const detachedCount = pageData.components.filter((c: any) => c.detached).length;
             analysis.findings.push({
@@ -298,7 +294,6 @@ export function createDesignAgent(context: FigmaContext) {
             });
           }
 
-          // Hierarchy check
           if (checkHierarchy && pageData?.textContent) {
             const fontSizes = pageData.textContent.map((t: any) => t.fontSize).filter(Boolean);
             const uniqueSizes = new Set(fontSizes);
@@ -309,7 +304,6 @@ export function createDesignAgent(context: FigmaContext) {
             });
           }
 
-          // Spacing check
           if (checkSpacing && pageData?.framesHierarchical) {
             const autoLayoutCount = pageData.framesHierarchical.filter((f: any) => f.autoLayout).length;
             analysis.findings.push({
@@ -319,19 +313,18 @@ export function createDesignAgent(context: FigmaContext) {
             });
           }
 
-          // Calculate total score
           analysis.score = analysis.findings.reduce((sum: number, f: any) => sum + f.score, 0);
 
           return analysis;
         }
-      }),
+      },
 
       // ===== MODIFICATION TOOLS =====
 
-      generateModificationPlan: tool({
+      generateModificationPlan: {
         description: 'Generate a plan for modifying designs (returns JSON commands that the plugin will execute)',
         parameters: z.object({
-          goal: z.string().describe('What you want to achieve (e.g., "fix accessibility issues", "apply design tokens")'),
+          goal: z.string().describe('What you want to achieve'),
           targetNodes: z.array(z.string()).optional().describe('Specific node IDs to modify'),
           modifications: z.array(z.object({
             action: z.enum(['modify', 'create', 'delete', 'group']),
@@ -339,9 +332,8 @@ export function createDesignAgent(context: FigmaContext) {
             properties: z.record(z.any()).optional()
           }))
         }),
-        execute: async ({ goal, targetNodes, modifications }) => {
-          // This tool generates commands but doesn't execute them
-          // The plugin will execute these commands
+        execute: async (params: { goal: string; targetNodes?: string[]; modifications: any[] }) => {
+          const { goal, targetNodes, modifications } = params;
           return {
             success: true,
             goal,
@@ -354,20 +346,20 @@ export function createDesignAgent(context: FigmaContext) {
             message: `Generated modification plan with ${modifications.length} changes. Review and approve to execute.`
           };
         }
-      }),
+      },
 
-      suggestImprovements: tool({
-        description: 'Suggest specific improvements based on analysis (UX, accessibility, design system, visual hierarchy)',
+      suggestImprovements: {
+        description: 'Suggest specific improvements based on analysis',
         parameters: z.object({
           focusArea: z.enum(['accessibility', 'design-system', 'visual-hierarchy', 'spacing', 'all']),
           priority: z.enum(['critical', 'high', 'medium', 'all']).default('all')
         }),
-        execute: async ({ focusArea, priority }) => {
-          const { pageData, selectedNodes } = context;
+        execute: async (params: { focusArea: string; priority: string }) => {
+          const { focusArea, priority } = params;
+          const { pageData } = context;
 
           const suggestions: any[] = [];
 
-          // Generate contextual suggestions based on the data
           if (focusArea === 'accessibility' || focusArea === 'all') {
             suggestions.push({
               priority: 'high',
@@ -406,7 +398,6 @@ export function createDesignAgent(context: FigmaContext) {
             });
           }
 
-          // Filter by priority
           const filtered = priority === 'all'
             ? suggestions
             : suggestions.filter(s => s.priority === priority || s.priority === 'critical');
@@ -418,80 +409,12 @@ export function createDesignAgent(context: FigmaContext) {
             summary: `Generated ${filtered.length} ${priority} priority suggestions for ${focusArea}`
           };
         }
-      })
+      }
     },
 
     maxSteps: 15,
     temperature: 1,
 
-    system: `You are an expert UX/UI design assistant for Figma with deep knowledge of:
-- Design systems and component architecture
-- WCAG accessibility standards (A, AA, AAA)
-- Visual hierarchy and typography
-- Spatial layout and alignment
-- User flows and navigation patterns
-- Modern design best practices
-
-## Your Capabilities
-
-You have 8 specialized tools to analyze and improve Figma designs:
-
-**Data Retrieval (4 tools):**
-- analyzeNodeStructure: Deep dive into node hierarchies and properties
-- searchByProperties: Find nodes matching specific criteria
-- getDesignSystem: Access design tokens, colors, typography
-- getFlowAnalysis: Understand user flows and navigation
-
-**Validation (2 tools):**
-- validateAccessibility: Check WCAG compliance comprehensively
-- analyzeDesignQuality: Evaluate overall design quality
-
-**Modification (2 tools):**
-- generateModificationPlan: Create executable modification commands
-- suggestImprovements: Provide actionable recommendations
-
-## How to Use Tools Effectively
-
-1. **Start Broad, Then Drill Down**
-   - First: Use analyzeNodeStructure or getDesignSystem for overview
-   - Then: Use searchByProperties to find specific elements
-   - Finally: Generate detailed analysis or modifications
-
-2. **Validate Before Modifying**
-   - Always run validateAccessibility or analyzeDesignQuality first
-   - Understand current state before suggesting changes
-   - Explain your reasoning for recommendations
-
-3. **Be Efficient with Tool Calls**
-   - Request only the data you need
-   - Combine related checks in single tool calls
-   - Avoid redundant searches
-
-4. **Provide Context with Results**
-   - Explain what you found and why it matters
-   - Reference specific nodes by name/ID
-   - Cite WCAG guidelines or design principles
-   - Give actionable next steps
-
-## Response Style
-
-- Be concise but thorough
-- Use markdown formatting for clarity
-- Highlight critical issues first
-- Provide specific, actionable recommendations
-- Explain the "why" behind suggestions
-- Reference design principles and standards
-
-## Example Workflow
-
-User: "Check if this design is accessible"
-
-1. validateAccessibility (level: 'AA', all checks enabled)
-2. Analyze results and identify top issues
-3. searchByProperties to find all affected nodes
-4. suggestImprovements (focusArea: 'accessibility')
-5. Provide prioritized list with explanations
-
-Remember: You're analyzing real Figma designs. Be specific, reference actual nodes, and provide practical guidance.`
+    system: `You are an expert UX/UI design assistant for Figma with deep knowledge of design systems, WCAG accessibility standards, visual hierarchy, and modern design best practices. Use the available tools to gather information and provide comprehensive analysis.`
   };
 }
