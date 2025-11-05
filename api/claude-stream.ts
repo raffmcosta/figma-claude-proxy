@@ -105,6 +105,24 @@ export default async function handler(req: Request) {
 
     const mappedModel = modelMap[model] || model;
 
+    // Validate ANTHROPIC_API_KEY
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error('MISSING ANTHROPIC_API_KEY!');
+      return new Response(
+        JSON.stringify({
+          error: 'Server configuration error: ANTHROPIC_API_KEY is not set',
+          hint: 'Add ANTHROPIC_API_KEY to Vercel environment variables'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('ANTHROPIC_API_KEY exists:', !!process.env.ANTHROPIC_API_KEY);
+    console.log('ANTHROPIC_API_KEY length:', process.env.ANTHROPIC_API_KEY?.length);
+
     // Detailed logging for debugging
     console.log('Streaming request:', {
       model: mappedModel,
@@ -131,17 +149,33 @@ export default async function handler(req: Request) {
     });
 
     // Create streaming response using Vercel AI SDK
-    const result = await streamText({
-      model: anthropic(mappedModel),
-      messages,
-      temperature: 1,
-    });
+    console.log('[STREAM] About to call streamText...');
+    console.log('[STREAM] Model:', mappedModel);
+    console.log('[STREAM] Messages count:', messages.length);
+
+    let result;
+    try {
+      result = await streamText({
+        model: anthropic(mappedModel),
+        messages,
+        temperature: 1,
+      });
+      console.log('[STREAM] streamText returned successfully');
+    } catch (streamError) {
+      console.error('[STREAM] streamText threw error:', streamError);
+      throw streamError;
+    }
+
+    console.log('[STREAM] Converting to text stream response...');
 
     // Return streaming response
     // The SDK handles SSE formatting automatically
-    return result.toTextStreamResponse({
+    const response = result.toTextStreamResponse({
       headers: corsHeaders,
     });
+
+    console.log('[STREAM] Response created, returning...');
+    return response;
 
   } catch (error: any) {
     console.error('Streaming error:', error);
