@@ -17,9 +17,12 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.41",
     "@vercel/node": "^3.0.0",
     "@vercel/speed-insights": "^1.2.0",
-    "axios": "^1.6.0"
+    "ai": "^5.0.87",
+    "axios": "^1.6.0",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
