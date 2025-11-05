@@ -105,10 +105,29 @@ export default async function handler(req: Request) {
 
     const mappedModel = modelMap[model] || model;
 
+    // Detailed logging for debugging
     console.log('Streaming request:', {
       model: mappedModel,
       messageCount: messages.length,
       maxTokens,
+    });
+
+    console.log('Detailed messages structure:');
+    messages.forEach((msg, index) => {
+      console.log(`Message ${index}:`, {
+        role: msg.role,
+        contentType: typeof msg.content,
+        isArray: Array.isArray(msg.content),
+        contentLength: typeof msg.content === 'string'
+          ? msg.content.length
+          : (Array.isArray(msg.content) ? msg.content.length : 'N/A'),
+        contentPreview: typeof msg.content === 'string'
+          ? msg.content.substring(0, 100)
+          : (Array.isArray(msg.content)
+              ? msg.content.map(part => ({ type: part.type, hasImage: !!part.image, hasText: !!part.text }))
+              : 'unknown'),
+        fullContent: JSON.stringify(msg.content).substring(0, 500)
+      });
     });
 
     // Create streaming response using Vercel AI SDK
