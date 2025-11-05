@@ -96,9 +96,9 @@ export default async function handler(req: Request) {
       contextKeys: context ? Object.keys(context) : []
     });
 
-    // Create the agent with Figma context and explicit API key
+    // Create the agent with Figma context
     console.log('[AGENT] Creating design agent...');
-    const { model: agentModel, tools, maxSteps, temperature, system } = createDesignAgent(context || {}, apiKey);
+    const { model: agentModel, tools, maxSteps, temperature, system } = createDesignAgent(context || {});
 
     // Import streamText dynamically to use with agent configuration
     const { streamText } = await import('ai');

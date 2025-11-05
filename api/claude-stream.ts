@@ -173,15 +173,10 @@ export default async function handler(req: Request) {
 
     let result;
     try {
-      // Create anthropic provider with explicit API key
-      console.log('[STREAM] Creating anthropic provider...');
-      const provider = anthropic(mappedModel, {
-        apiKey: apiKey,
-      });
-      console.log('[STREAM] Provider created, calling streamText...');
+      console.log('[STREAM] Calling streamText...');
 
       result = await streamText({
-        model: provider,
+        model: anthropic(mappedModel),
         messages,
         temperature: 1,
       });

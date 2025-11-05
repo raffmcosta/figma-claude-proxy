@@ -19,9 +19,9 @@ interface FigmaContext {
 /**
  * Create the design agent with tools
  */
-export function createDesignAgent(context: FigmaContext, apiKey?: string) {
+export function createDesignAgent(context: FigmaContext) {
   return {
-    model: anthropic('claude-sonnet-4', apiKey ? { apiKey } : undefined),
+    model: anthropic('claude-sonnet-4'),
 
     tools: {
       // ===== DATA RETRIEVAL TOOLS =====
