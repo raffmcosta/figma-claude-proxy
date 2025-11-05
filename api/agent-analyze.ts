@@ -7,7 +7,9 @@
 
 import { createDesignAgent } from './design-agent';
 
-// Note: Edge runtime removed due to timeout issues. Using Node.js runtime instead.
+// Using Edge runtime (required for Web API Response type)
+export const runtime = 'edge';
+export const maxDuration = 60; // 60 seconds timeout
 
 // CORS headers for Figma plugin
 const corsHeaders = {

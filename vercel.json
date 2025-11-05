@@ -31,6 +31,14 @@
     "api/claude-proxy.ts": {
       "memory": 1024,
       "maxDuration": 60
+    },
+    "api/claude-stream.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/agent-analyze.ts": {
+      "memory": 1024,
+      "maxDuration": 60
     }
   }
 }
