@@ -66,15 +66,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    // Stream the response
-    const stream = result.textStream;
-
-    for await (const chunk of stream) {
-      res.write(`data: ${chunk}\n\n`);
-    }
-
-    res.write('data: [DONE]\n\n');
-    res.end();
+    // Stream the response using pipeTextStreamToResponse
+    result.pipeTextStreamToResponse(res);
 
   } catch (error: any) {
     console.error('[STREAM-V2] Error:', error);
